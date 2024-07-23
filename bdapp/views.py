@@ -1,8 +1,13 @@
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
+from datetime import date
 import os
 import mysql.connector
-from django.conf import settings
+from rest_framework.decorators import api_view
+from django.http import JsonResponse
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+import mysql.connector
 import os
 from django.http import JsonResponse
 from datetime import date
@@ -28,6 +33,12 @@ def transform_data(request):
         if conexion.is_connected():
             cursor = conexion.cursor()
 
+            # Ejecutar la consulta SQL desde la variable de entorno para insertar datos adicionales
+            consulta = os.getenv('INSERT_QUERY')
+            if consulta:
+                cursor.execute(consulta)
+                conexion.commit()
+
             # Obtener todos los datos de la tabla raw_data
             cursor.execute("SELECT id, nombre, apellido, edad FROM raw_data")
             raw_data = cursor.fetchall()
@@ -35,15 +46,16 @@ def transform_data(request):
             # Transformar los datos
             for data in raw_data:
                 id, nombre, apellido, fecha_nacimiento = data
-                nombre_completo = f"{nombre} {apellido}"
-                edad_nominal = (date.today() - fecha_nacimiento).days // 365
+                nombre_completo_transformado = f"{nombre} {apellido}"
+                edad_nominal_transformada = (date.today() - fecha_nacimiento).days // 365
 
-                # Insertar los datos transformados en la tabla transformed_data
-                insert_query = """
-                INSERT INTO transformed_data (nombre_completo, edad_nominal)
-                VALUES (%s, %s)
+                # Actualizar los datos en la tabla raw_data
+                update_query = """
+                UPDATE raw_data
+                SET nombre_completo = %s, edad_nominal = %s
+                WHERE id = %s
                 """
-                cursor.execute(insert_query, (nombre_completo, edad_nominal))
+                cursor.execute(update_query, (nombre_completo_transformado, edad_nominal_transformada, id))
 
             # Confirmar los cambios
             conexion.commit()
@@ -55,8 +67,9 @@ def transform_data(request):
             return JsonResponse({'status': 'error', 'message': 'No se pudo conectar a la base de datos'})
     except mysql.connector.Error as error:
         return JsonResponse({'status': 'error', 'message': f'Error: {error}'})
+
     
-    
+
 @api_view(['GET'])
 def get_transformed_data(request):
     try:
@@ -79,7 +92,7 @@ def get_transformed_data(request):
             cursor = conexion.cursor(dictionary=True)
 
             # Ejecutar consulta para obtener los datos transformados
-            cursor.execute("SELECT * FROM datos")
+            cursor.execute("SELECT * FROM raw_data")
             rows = cursor.fetchall()
 
             # Imprimir los datos
