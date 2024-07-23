@@ -55,6 +55,8 @@ def transform_data(request):
             return JsonResponse({'status': 'error', 'message': 'No se pudo conectar a la base de datos'})
     except mysql.connector.Error as error:
         return JsonResponse({'status': 'error', 'message': f'Error: {error}'})
+    
+    
 @api_view(['GET'])
 def get_transformed_data(request):
     try:
